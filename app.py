@@ -43,8 +43,8 @@ SMTP_SERVER = 'smtp.gmail.com'
 SMTP_PORT = 465
 
 # Load email credentials from environment
-EMAIL_SENDER = os.getenv("EMAIL_SENDER")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+EMAIL_SENDER = st.secrets.get("EMAIL_SENDER")
+EMAIL_PASSWORD = st.secrets.get("EMAIL_PASSWORD")
 
 # Session timeout in seconds (15 minutes)
 SESSION_TIMEOUT = 15 * 60
@@ -58,7 +58,7 @@ try:
     load_dotenv()
     
     # Try to get the API key from environment variables first
-    api_key = os.getenv("GOOGLE_API_KEY")
+    api_key = st.secrets.get("GOOGLE_API_KEY")
     if api_key:
         genai.configure(api_key=api_key)
         api_configured = True
@@ -94,7 +94,7 @@ if OPENAI_AVAILABLE and OpenAI is not None:
         # Try to get A4F API key from environment
         from dotenv import load_dotenv
         load_dotenv()
-        a4f_api_key = os.getenv("A4F_API_KEY") or os.getenv("a4f_api_key")
+        a4f_api_key = st.secrets.get("A4F_API_KEY") or st.secrets.get("a4f_api_key")
 
         if a4f_api_key:
             a4f_client = OpenAI(
@@ -320,7 +320,7 @@ def web_search(query, num_results=5):
     """
     try:
         # Get API key from environment variables
-        serper_api_key = os.getenv("SERPER_API_KEY")
+        serper_api_key = st.secrets.get("SERPER_API_KEY")
         if not serper_api_key:
             return ["❌ Serper API key not configured. Please set SERPER_API_KEY in your environment variables."]
         
