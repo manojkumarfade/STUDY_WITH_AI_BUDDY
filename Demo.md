@@ -7,7 +7,6 @@
 # 🎬 AI Study Buddy – Demo Showcase
 
 This page includes all **screenshots, hosted app links, and demo videos** for the project.  
-You can update this anytime as your app evolves.
 
 ---
 
@@ -17,7 +16,7 @@ You can update this anytime as your app evolves.
 |-----------|---------|------|
 | **Streamlit Cloud** | 🟢 Live | [Add your Streamlit link here] |
 | **Netlify Landing Page** | 🟢 Live | [Add your Netlify site link here] |
-| **GitHub Repository** | 🟢 Public | [Add repo link] |
+| **GitHub Repository** | 🟢 Public | [https://github.com/manojkumarfade/STUDY_WITH_AI_BUDDY] |
 
 ---
 
@@ -31,7 +30,6 @@ You can update this anytime as your app evolves.
 | **Study Pet Evolution** | ![Pet Evolution](assets/screenshot4.png) |
 | **Quiz Interface** | ![Quiz](assets/screenshot5.png) |
 
-> 💡 Tip: Use `.png` or `.jpg` format, and store images in `/assets/`.
 
 ---
 
@@ -39,12 +37,6 @@ You can update this anytime as your app evolves.
 
 ### 🎓 Full Project Walkthrough
 📹 [Click to Watch Demo Video](https://your-video-link-here.com)
-
-### 💬 AI Chat + Persona Showcase
-📹 [Click to Watch Persona Demo](https://your-video-link-here.com)
-
-### 🧠 Learning & Gamification Flow
-📹 [Click to Watch Gamified Study Flow](https://your-video-link-here.com)
 
 ---
 
@@ -62,14 +54,11 @@ You can update this anytime as your app evolves.
 
 > Add once ready:
 
-- 🔗 LinkedIn: [Your Profile]
-- 🐙 GitHub: [Your Profile]
-- 🐦 Twitter: [Your Handle]
-- 💼 Portfolio: [Your Website]
+- 🔗 LinkedIn: [(https://www.linkedin.com/in/booramanojkumar/)]
+- 🐙 GitHub: [(https://github.com/manojkumarfade)]
 
 ---
 
 ## 🏁 Credits
 
-Developed by **YOUR NAME (2025)**  
-Powered by **Google Gemini**, **A4F API**, and **Streamlit Cloud**  
+Developed by **MANOJ KUMAR (2025)**  
