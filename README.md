@@ -126,3 +126,5 @@ It’s not just about studying harder — it’s about studying *smarter*.
 ```bash
 git clone https://github.com/YOUR-USERNAME/AI-Study-Buddy-Enhanced.git
 cd AI-Study-Buddy-Enhanced
+streamlit run enhanced.py
+
