@@ -1,17 +1,15 @@
 streamlit
-sqlite3-bro
 pillow
 PyPDF2
 python-dotenv
 google-generativeai
 requests
 cryptography
-smtplib
 email-validator
 plotly
 youtube-transcript-api
-speechrecognition
-opencv-python
+SpeechRecognition
+opencv-python-headless
 pytesseract
 transformers
 diffusers
@@ -21,3 +19,4 @@ pyvista
 streamlit-webrtc
 av
 pytz
+
