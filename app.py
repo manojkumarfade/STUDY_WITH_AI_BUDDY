@@ -77,8 +77,6 @@ except Exception as e:
 # Global flag to track if API is configured
 GEMINI_API_AVAILABLE = api_configured
 
-GEMINI_API_AVAILABLE = api_configured
-
 # Handle new chat state
 if 'new_chat_initiated' in st.session_state and st.session_state.new_chat_initiated:
     st.session_state.new_chat_initiated = False
@@ -444,276 +442,298 @@ def init_achievements():
         ("pet_lover", "Pet Caretaker", "Keep pet happiness above 80 for 7 days", "❤️"),
     ]
     
-    conn = get_db_connection()
-    for ach_id, name, desc, icon in achievements:
-        conn.execute("""
-            INSERT OR IGNORE INTO achievements (id, name, description, icon)
-            VALUES (?, ?, ?, ?)
-        """, (ach_id, name, desc, icon))
-    conn.commit()
+    conn = None
+    try:
+        conn = get_db_connection()
+        for ach_id, name, desc, icon in achievements:
+            conn.execute("""
+                INSERT OR IGNORE INTO achievements (id, name, description, icon)
+                VALUES (?, ?, ?, ?)
+            """, (ach_id, name, desc, icon))
+        conn.commit()
+    except sqlite3.Error as e:
+        st.error(f"Database error during achievements initialization: {e}")
+        if conn:
+            conn.rollback()
+    except Exception as e:
+        st.error(f"Unexpected error during achievements initialization: {e}")
+        if conn:
+            conn.rollback()
 
 def init_database():
     """Initialize enhanced database schema"""
-    os.makedirs('data', exist_ok=True)
-    
-    # Check if users table exists and has correct schema
-    conn = get_db_connection()
     try:
-        # Check if users table exists
-        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
-        if not cursor.fetchone():
-            # Table doesn't exist, create it
-            conn.execute('''
-                CREATE TABLE users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    email TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    verified INTEGER DEFAULT 0,
-                    verification_code TEXT,
-                    created_at TEXT,
-                    last_login TEXT,
-                    session_token TEXT,
-                    session_expires TEXT
-                )
-            ''')
-            conn.commit()
-            st.info("Users table created successfully!")
-        else:
-            # Table exists, check and add missing columns
-            cursor = conn.execute("PRAGMA table_info(users)")
-            columns = [column[1] for column in cursor.fetchall()]
-            
-            # Required columns for the new schema
-            required_columns = {
-                'password_hash': 'TEXT',
-                'verified': 'INTEGER DEFAULT 0',
-                'verification_code': 'TEXT',
-                'created_at': 'TEXT',
-                'last_login': 'TEXT',
-                'session_token': 'TEXT',
-                'session_expires': 'TEXT'
-            }
-            
-            columns_added = []
-            for col_name, col_type in required_columns.items():
-                if col_name not in columns:
-                    try:
-                        conn.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
-                        columns_added.append(col_name)
-                    except Exception as col_error:
-                        st.warning(f"Could not add column {col_name}: {col_error}")
-            
-            if columns_added:
-                conn.commit()
-                st.info(f"Database schema updated! Added columns: {', '.join(columns_added)}")
-    except Exception as e:
-        st.error(f"Database initialization error: {e}")
-    
-    # Check and create user_chats table
-    try:
-        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_chats'")
-        if not cursor.fetchone():
-            # Table doesn't exist, create it
-            conn.execute('''
-                CREATE TABLE user_chats (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_email TEXT NOT NULL,
-                    message_role TEXT NOT NULL,
-                    message_content TEXT NOT NULL,
-                    timestamp TEXT NOT NULL,
-                    FOREIGN KEY (user_email) REFERENCES users (email)
-                )
-            ''')
-            conn.commit()
-            st.info("User chats table created successfully!")
-        else:
-            # Table exists, check and add missing columns
-            cursor = conn.execute("PRAGMA table_info(user_chats)")
-            columns = [column[1] for column in cursor.fetchall()]
-            
-            required_chat_columns = {
-                'user_email': 'TEXT NOT NULL',
-                'message_role': 'TEXT NOT NULL',
-                'message_content': 'TEXT NOT NULL',
-                'timestamp': 'TEXT NOT NULL'
-            }
-            
-            columns_added = []
-            for col_name, col_type in required_chat_columns.items():
-                if col_name not in columns:
-                    try:
-                        conn.execute(f"ALTER TABLE user_chats ADD COLUMN {col_name} {col_type}")
-                        columns_added.append(col_name)
-                    except Exception as col_error:
-                        st.warning(f"Could not add column {col_name} to user_chats: {col_error}")
-            
-            if columns_added:
-                conn.commit()
-                st.info(f"User chats table updated! Added columns: {', '.join(columns_added)}")
-    except Exception as e:
-        st.error(f"User chats table initialization error: {e}")
-
-    # Create all tables with proper schema
-    tables_to_create = {
-        'study_sessions': '''
-            CREATE TABLE IF NOT EXISTS study_sessions (
-                id TEXT PRIMARY KEY,
-                user_email TEXT,
-                session_type TEXT,
-                duration INTEGER,
-                score INTEGER,
-                timestamp TEXT,
-                xp_earned INTEGER DEFAULT 0,
-                FOREIGN KEY (user_email) REFERENCES users (email)
-            )
-        ''',
-        'flashcards': '''
-            CREATE TABLE IF NOT EXISTS flashcards (
-                id TEXT PRIMARY KEY,
-                user_email TEXT,
-                question TEXT,
-                answer TEXT,
-                created_at TEXT,
-                times_reviewed INTEGER DEFAULT 0,
-                times_correct INTEGER DEFAULT 0,
-                FOREIGN KEY (user_email) REFERENCES users (email)
-            )
-        ''',
-        'study_materials': '''
-            CREATE TABLE IF NOT EXISTS study_materials (
-                id TEXT PRIMARY KEY,
-                user_email TEXT,
-                material_name TEXT,
-                material_type TEXT,
-                content TEXT,
-                summary TEXT,
-                FOREIGN KEY (user_email) REFERENCES users (email)
-            )
-        ''',
-        'achievements': '''
-            CREATE TABLE IF NOT EXISTS achievements (
-                id TEXT PRIMARY KEY,
-                name TEXT,
-                description TEXT,
-                icon TEXT,
-                unlocked INTEGER DEFAULT 0,
-                unlocked_at TEXT
-            )
-        ''',
-        'quiz_attempts': '''
-            CREATE TABLE IF NOT EXISTS quiz_attempts (
-                id TEXT PRIMARY KEY,
-                user_email TEXT,
-                question_hash TEXT,
-                question TEXT,
-                correct INTEGER,
-                confidence INTEGER,
-                timestamp TEXT,
-                FOREIGN KEY (user_email) REFERENCES users (email)
-            )
-        ''',
-        'user_profile': '''
-            CREATE TABLE IF NOT EXISTS user_profile (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_email TEXT UNIQUE NOT NULL,
-                username TEXT DEFAULT 'Scholar',
-                total_xp INTEGER DEFAULT 0,
-                level INTEGER DEFAULT 1,
-                study_pet TEXT DEFAULT 'egg',
-                pet_happiness INTEGER DEFAULT 50,
-                learning_style TEXT DEFAULT 'unknown',
-                current_theme TEXT DEFAULT 'default',
-                created_at TEXT,
-                FOREIGN KEY (user_email) REFERENCES users (email)
-            )
-        ''',
-        'daily_quests': '''
-            CREATE TABLE IF NOT EXISTS daily_quests (
-                id TEXT PRIMARY KEY,
-                user_email TEXT,
-                date TEXT,
-                quest_type TEXT,
-                target INTEGER,
-                progress INTEGER DEFAULT 0,
-                completed INTEGER DEFAULT 0,
-                FOREIGN KEY (user_email) REFERENCES users (email)
-            )
-        ''',
-        'chat_sessions': '''
-            CREATE TABLE IF NOT EXISTS chat_sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_email TEXT NOT NULL,
-                session_name TEXT NOT NULL,
-                messages TEXT NOT NULL,
-                created_at TEXT NOT NULL,
-                FOREIGN KEY (user_email) REFERENCES users (email)
-            )
-        '''
-    }
-    
-    # Create tables and add missing columns
-    for table_name, create_sql in tables_to_create.items():
+        os.makedirs('data', exist_ok=True)
+        
+        # Check if users table exists and has correct schema
+        conn = get_db_connection()
         try:
-            # Check if table exists
-            cursor = conn.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
-            table_exists = cursor.fetchone()
-            
-            if not table_exists:
-                # Create table
-                conn.execute(create_sql)
+            # Check if users table exists
+            cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+            if not cursor.fetchone():
+                # Table doesn't exist, create it
+                conn.execute('''
+                    CREATE TABLE users (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        email TEXT UNIQUE NOT NULL,
+                        password_hash TEXT NOT NULL,
+                        verified INTEGER DEFAULT 0,
+                        verification_code TEXT,
+                        created_at TEXT,
+                        last_login TEXT,
+                        session_token TEXT,
+                        session_expires TEXT
+                    )
+                ''')
                 conn.commit()
-                st.info(f"{table_name} table created successfully!")
+                st.info("Users table created successfully!")
             else:
                 # Table exists, check and add missing columns
-                cursor = conn.execute(f"PRAGMA table_info({table_name})")
+                cursor = conn.execute("PRAGMA table_info(users)")
                 columns = [column[1] for column in cursor.fetchall()]
                 
-                # Define required columns for each table
+                # Required columns for the new schema
                 required_columns = {
-                    'study_sessions': ['user_email'],
-                    'flashcards': ['user_email'],
-                    'study_materials': ['user_email'],
-                    'achievements': [],  # No user_email needed
-                    'quiz_attempts': ['user_email'],
-                    'user_profile': ['user_email'],
-                    'daily_quests': ['user_email'],
-                    'chat_sessions': ['user_email']
+                    'password_hash': 'TEXT',
+                    'verified': 'INTEGER DEFAULT 0',
+                    'verification_code': 'TEXT',
+                    'created_at': 'TEXT',
+                    'last_login': 'TEXT',
+                    'session_token': 'TEXT',
+                    'session_expires': 'TEXT'
                 }
                 
                 columns_added = []
-                for col_name in required_columns.get(table_name, []):
+                for col_name, col_type in required_columns.items():
                     if col_name not in columns:
                         try:
-                            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} TEXT")
+                            conn.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
                             columns_added.append(col_name)
                         except Exception as col_error:
-                            st.warning(f"Could not add column {col_name} to {table_name}: {col_error}")
+                            st.warning(f"Could not add column {col_name}: {col_error}")
                 
                 if columns_added:
                     conn.commit()
-                    st.info(f"{table_name} table updated! Added columns: {', '.join(columns_added)}")
-        
+                    st.info(f"Database schema updated! Added columns: {', '.join(columns_added)}")
         except Exception as e:
-            st.error(f"Error creating/updating {table_name} table: {e}")
-    
-    # Legacy queries for backward compatibility (these will be ignored if tables already exist)
-    queries = []
-    
-    conn = get_db_connection()
-    for query in queries:
-        conn.execute(query)
-    conn.commit()
-    
-    # Initialize default achievements
-    init_achievements()
-    
-    # Migrate existing users if needed
-    migrate_existing_users()
+            st.error(f"Database initialization error: {e}")
+        
+        # Check and create user_chats table
+        try:
+            cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='user_chats'")
+            if not cursor.fetchone():
+                # Table doesn't exist, create it
+                conn.execute('''
+                    CREATE TABLE user_chats (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        user_email TEXT NOT NULL,
+                        message_role TEXT NOT NULL,
+                        message_content TEXT NOT NULL,
+                        timestamp TEXT NOT NULL,
+                        FOREIGN KEY (user_email) REFERENCES users (email)
+                    )
+                ''')
+                conn.commit()
+                st.info("User chats table created successfully!")
+            else:
+                # Table exists, check and add missing columns
+                cursor = conn.execute("PRAGMA table_info(user_chats)")
+                columns = [column[1] for column in cursor.fetchall()]
+                
+                required_chat_columns = {
+                    'user_email': 'TEXT NOT NULL',
+                    'message_role': 'TEXT NOT NULL',
+                    'message_content': 'TEXT NOT NULL',
+                    'timestamp': 'TEXT NOT NULL'
+                }
+                
+                columns_added = []
+                for col_name, col_type in required_chat_columns.items():
+                    if col_name not in columns:
+                        try:
+                            conn.execute(f"ALTER TABLE user_chats ADD COLUMN {col_name} {col_type}")
+                            columns_added.append(col_name)
+                        except Exception as col_error:
+                            st.warning(f"Could not add column {col_name} to user_chats: {col_error}")
+                
+                if columns_added:
+                    conn.commit()
+                    st.info(f"User chats table updated! Added columns: {', '.join(columns_added)}")
+        except Exception as e:
+            st.error(f"User chats table initialization error: {e}")
+
+        # Create all tables with proper schema
+        tables_to_create = {
+            'study_sessions': '''
+                CREATE TABLE IF NOT EXISTS study_sessions (
+                    id TEXT PRIMARY KEY,
+                    user_email TEXT,
+                    session_type TEXT,
+                    duration INTEGER,
+                    score INTEGER,
+                    timestamp TEXT,
+                    xp_earned INTEGER DEFAULT 0,
+                    FOREIGN KEY (user_email) REFERENCES users (email)
+                )
+            ''',
+            'flashcards': '''
+                CREATE TABLE IF NOT EXISTS flashcards (
+                    id TEXT PRIMARY KEY,
+                    user_email TEXT,
+                    question TEXT,
+                    answer TEXT,
+                    created_at TEXT,
+                    times_reviewed INTEGER DEFAULT 0,
+                    times_correct INTEGER DEFAULT 0,
+                    FOREIGN KEY (user_email) REFERENCES users (email)
+                )
+            ''',
+            'study_materials': '''
+                CREATE TABLE IF NOT EXISTS study_materials (
+                    id TEXT PRIMARY KEY,
+                    user_email TEXT,
+                    material_name TEXT,
+                    material_type TEXT,
+                    content TEXT,
+                    summary TEXT,
+                    FOREIGN KEY (user_email) REFERENCES users (email)
+                )
+            ''',
+            'achievements': '''
+                CREATE TABLE IF NOT EXISTS achievements (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    description TEXT,
+                    icon TEXT,
+                    unlocked INTEGER DEFAULT 0,
+                    unlocked_at TEXT
+                )
+            ''',
+            'quiz_attempts': '''
+                CREATE TABLE IF NOT EXISTS quiz_attempts (
+                    id TEXT PRIMARY KEY,
+                    user_email TEXT,
+                    question_hash TEXT,
+                    question TEXT,
+                    correct INTEGER,
+                    confidence INTEGER,
+                    timestamp TEXT,
+                    FOREIGN KEY (user_email) REFERENCES users (email)
+                )
+            ''',
+            'user_profile': '''
+                CREATE TABLE IF NOT EXISTS user_profile (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_email TEXT UNIQUE NOT NULL,
+                    username TEXT DEFAULT 'Scholar',
+                    total_xp INTEGER DEFAULT 0,
+                    level INTEGER DEFAULT 1,
+                    study_pet TEXT DEFAULT 'egg',
+                    pet_happiness INTEGER DEFAULT 50,
+                    learning_style TEXT DEFAULT 'unknown',
+                    current_theme TEXT DEFAULT 'default',
+                    created_at TEXT,
+                    FOREIGN KEY (user_email) REFERENCES users (email)
+                )
+            ''',
+            'daily_quests': '''
+                CREATE TABLE IF NOT EXISTS daily_quests (
+                    id TEXT PRIMARY KEY,
+                    user_email TEXT,
+                    date TEXT,
+                    quest_type TEXT,
+                    target INTEGER,
+                    progress INTEGER DEFAULT 0,
+                    completed INTEGER DEFAULT 0,
+                    FOREIGN KEY (user_email) REFERENCES users (email)
+                )
+            ''',
+            'chat_sessions': '''
+                CREATE TABLE IF NOT EXISTS chat_sessions (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_email TEXT NOT NULL,
+                    session_name TEXT NOT NULL,
+                    messages TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (user_email) REFERENCES users (email)
+                )
+            '''
+        }
+        
+        # Create tables and add missing columns
+        for table_name, create_sql in tables_to_create.items():
+            try:
+                # Check if table exists
+                cursor = conn.execute(f"SELECT name FROM sqlite_master WHERE type='table' AND name='{table_name}'")
+                table_exists = cursor.fetchone()
+                
+                if not table_exists:
+                    # Create table
+                    conn.execute(create_sql)
+                    conn.commit()
+                    st.info(f"{table_name} table created successfully!")
+                else:
+                    # Table exists, check and add missing columns
+                    cursor = conn.execute(f"PRAGMA table_info({table_name})")
+                    columns = [column[1] for column in cursor.fetchall()]
+                    
+                    # Define required columns for each table
+                    required_columns = {
+                        'study_sessions': ['user_email'],
+                        'flashcards': ['user_email'],
+                        'study_materials': ['user_email'],
+                        'achievements': [],  # No user_email needed
+                        'quiz_attempts': ['user_email'],
+                        'user_profile': ['user_email'],
+                        'daily_quests': ['user_email'],
+                        'chat_sessions': ['user_email']
+                    }
+                    
+                    columns_added = []
+                    for col_name in required_columns.get(table_name, []):
+                        if col_name not in columns:
+                            try:
+                                conn.execute(f"ALTER TABLE {table_name} ADD COLUMN {col_name} TEXT")
+                                columns_added.append(col_name)
+                            except Exception as col_error:
+                                st.warning(f"Could not add column {col_name} to {table_name}: {col_error}")
+                    
+                    if columns_added:
+                        conn.commit()
+                        st.info(f"{table_name} table updated! Added columns: {', '.join(columns_added)}")
+            
+            except Exception as e:
+                st.error(f"Error creating/updating {table_name} table: {e}")
+        
+        # Legacy queries for backward compatibility (these will be ignored if tables already exist)
+        queries = []
+        
+        conn = get_db_connection()
+        try:
+            for query in queries:
+                conn.execute(query)
+            conn.commit()
+        except sqlite3.Error as e:
+            st.error(f"Database error during commit: {e}")
+            conn.rollback()
+        except Exception as e:
+            st.error(f"Unexpected error during commit: {e}")
+            conn.rollback()
+        
+        # Initialize default achievements
+        init_achievements()
+        
+        # Migrate existing users if needed
+        migrate_existing_users()
+        
+    except Exception as e:
+        st.error(f"Error initializing database: {e}")
 
 def migrate_existing_users():
     """Migrate existing users to new schema"""
-    conn = get_db_connection()
+    conn = None
     try:
+        conn = get_db_connection()
         # Check if there are users without password_hash
         cursor = conn.execute("SELECT email FROM users WHERE password_hash IS NULL OR password_hash = ''")
         users_to_migrate = cursor.fetchall()
@@ -1538,15 +1558,8 @@ def display_chat_history_sidebar():
                         if role == "user":
                             st.markdown(f"**You** ({time_str}):")
                             st.markdown(f"💬 {content}")
-                        else:
-                            st.markdown(f"**AI** ({time_str}):")
-                            st.markdown(f"🤖 {content}")
-                        st.markdown("---")
-                        
                 except Exception as e:
-                    st.error(f"Error loading messages: {e}")
-    else:
-        st.info("No chat history yet")
+                    st.error(f"Error loading chat messages: {e}")
     
     # Clear chat history button
     if st.button("🗑️ Clear All Chat History", type="secondary"):
@@ -2901,7 +2914,7 @@ def get_theme_css(theme_name):
     return f"""
     <style>
         .stApp {{
-            background-image: url('https://iili.io/KORGBKG.png');
+            background-image: url('https://i.postimg.cc/mk4x0MCy/Screenshot-2025-10-12-165723.png');
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
@@ -4264,6 +4277,14 @@ with tabs[7]:
         
         st.info("💡 These predictions are based on your study patterns, quiz performance, and time allocation.")
 
+# AUTO-REFRESH FOR TIMER & CLOCK
+update_clock()
+if st.session_state.session_active and st.session_state.timer_running:
+    time.sleep(0.5)
+    st.rerun()
+else:
+    time.sleep(60) 
+    st.rerun()
 # AUTO-REFRESH FOR TIMER & CLOCK
 update_clock()
 if st.session_state.session_active and st.session_state.timer_running:
